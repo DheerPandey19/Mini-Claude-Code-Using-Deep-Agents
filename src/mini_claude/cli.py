@@ -53,20 +53,24 @@ def run_turn(agent, user_text: str, config: dict) -> None:
         interrupted = False
         print("agent> ", end="", flush=True)
 
-        for mode, data in agent.stream(
-            payload,
-            config=config,
-            stream_mode=["messages", "updates"],
-        ):
-            if mode == "messages":
-                token, _metadata = data
-                _print_chunk_content(getattr(token, "content", None))
-            elif mode == "updates" and isinstance(data, dict) and "__interrupt__" in data:
-                interrupt_value = data["__interrupt__"][0].value
-                decisions = _ask_decisions(interrupt_value["action_requests"])
-                payload = Command(resume={"decisions": decisions})
-                interrupted = True
-                break
+        try:
+            for mode, data in agent.stream(
+                payload,
+                config=config,
+                stream_mode=["messages", "updates"],
+            ):
+                if mode == "messages":
+                    token, _metadata = data
+                    _print_chunk_content(getattr(token, "content", None))
+                elif mode == "updates" and isinstance(data, dict) and "__interrupt__" in data:
+                    interrupt_value = data["__interrupt__"][0].value
+                    decisions = _ask_decisions(interrupt_value["action_requests"])
+                    payload = Command(resume={"decisions": decisions})
+                    interrupted = True
+                    break
+        except Exception as e:
+            print(f"\nError {e}")
+            return
 
         print()
         if not interrupted:
@@ -74,6 +78,7 @@ def run_turn(agent, user_text: str, config: dict) -> None:
 
 
 def main() -> None:
+
     load_dotenv()
 
     parser = argparse.ArgumentParser(description="Mini Claude Code (Deep Agents)")
