@@ -98,6 +98,37 @@ you'll see **Approve? [y/N]**.
 `--cwd` (with `virtual_mode=True`), but `execute` is not a sandbox. Only approve
 commands you understand. Do not commit `.env`.
 
+## Testing Instructions
+
+- Run tests by executing: `pytest`
+- Ensure all tests pass before making changes.
+- Review test coverage to ensure all features are covered.
+
+## Contributing Guide
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes with clear messages.
+4. Submit a pull request for review.
+
+## FAQ
+
+- **What models can I use?**
+  You can specify any model in the `.env` file that is compatible with your use case.
+- **How to update dependencies?**
+  Update `pyproject.toml` and run `pip install -e .`.
+
+## Detailed Usage Examples
+
+- Run a one-shot command:
+  ```powershell
+  mini-claude --cwd . "List the Python files in this project"
+  ```
+- Start a terminal session:
+  ```powershell
+  python -m mini_claude --cwd .
+  ```
+
 ## Status
 
 v1 learning build is complete: prompt + agent + CLI with shell approval.

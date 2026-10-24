@@ -9,19 +9,20 @@ from langgraph.types import Command
 from mini_claude.agent import build_agent
 
 
-def _print_message_content(content) -> None:
+def _print_chunk_content(content) -> None:
+    if not content:
+        return
     if isinstance(content, str):
-        print(content)
+        print(content, end="", flush=True)
         return
     if isinstance(content, list):
         for block in content:
             if isinstance(block, dict) and block.get("type") == "text":
-                print(block.get("text", ""), end="")
+                print(block.get("text", ""), end="", flush=True)
             elif isinstance(block, str):
-                print(block, end="")
-        print()
+                print(block, end="", flush=True)
         return
-    print(content)
+    print(content, end="", flush=True)
 
 
 def _ask_decisions(action_requests: list[dict]) -> list[dict]:
@@ -46,22 +47,30 @@ def _ask_decisions(action_requests: list[dict]) -> list[dict]:
 
 
 def run_turn(agent, user_text: str, config: dict) -> None:
-    result = agent.invoke(
-        {"messages": [{"role": "user", "content": user_text}]},
-        config=config,
-    )
+    payload = {"messages": [{"role": "user", "content": user_text}]}
 
-    # May pause more than once (e.g. several shell commands)
-    while result.get("__interrupt__"):
-        interrupt_value = result["__interrupt__"][0].value
-        action_requests = interrupt_value["action_requests"]
-        decisions = _ask_decisions(action_requests)
-        result = agent.invoke(
-            Command(resume={"decisions": decisions}),
-            config=config,  # same thread_id required
-        )
+    while True:
+        interrupted = False
+        print("agent> ", end="", flush=True)
 
-    _print_message_content(result["messages"][-1].content)
+        for mode, data in agent.stream(
+            payload,
+            config=config,
+            stream_mode=["messages", "updates"],
+        ):
+            if mode == "messages":
+                token, _metadata = data
+                _print_chunk_content(getattr(token, "content", None))
+            elif mode == "updates" and isinstance(data, dict) and "__interrupt__" in data:
+                interrupt_value = data["__interrupt__"][0].value
+                decisions = _ask_decisions(interrupt_value["action_requests"])
+                payload = Command(resume={"decisions": decisions})
+                interrupted = True
+                break
+
+        print()
+        if not interrupted:
+            break
 
 
 def main() -> None:

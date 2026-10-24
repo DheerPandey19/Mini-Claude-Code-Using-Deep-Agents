@@ -20,5 +20,10 @@ def build_agent(root_dir: str | Path, model: str):
         ),
         system_prompt=CODING_PROMPT,
         checkpointer=MemorySaver(),
-        interrupt_on={"execute": True},
+        interrupt_on={
+            "execute": True,
+            "write_file": True,
+            "edit_file": True,
+            "delete": True
+            },
     )
