@@ -8,6 +8,7 @@ dependencies = [
     "deepagents",
     "python-dotenv",
     "langchain-openai",
+    "langgraph-checkpoint-sqlite",
 ]
 
 [project.scripts]

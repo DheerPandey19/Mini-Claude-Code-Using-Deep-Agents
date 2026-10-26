@@ -8,6 +8,18 @@ from langgraph.types import Command
 
 from mini_claude.agent import build_agent
 
+def _thread_id(root: Path, requested: str | None) -> str:
+    if requested:
+        return requested
+    path = root / ".mini-claude" / "thread_id"
+    if path.exists():
+        saved = path.read_text(encoding="utf-8").strip()
+        if saved:
+            return saved
+    new_id = str(uuid.uuid4())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new_id, encoding="utf-8")
+    return new_id
 
 def _print_chunk_content(content) -> None:
     if not content:
@@ -84,6 +96,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Mini Claude Code (Deep Agents)")
     parser.add_argument("prompt", nargs="?", help="One-shot prompt (optional)")
     parser.add_argument(
+        "--thread",
+        default=None,
+        help="Conversation id (default: saved in .mini-claude/thread_id)",
+    )
+    parser.add_argument(
         "--cwd",
         default=".",
         help="Project directory for the agent (default: current dir)",
@@ -99,7 +116,8 @@ def main() -> None:
 
     root = Path(args.cwd).resolve()
     agent = build_agent(root_dir=root, model=model)
-    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    thread_id = _thread_id(root, args.thread)
+    config = {"configurable": {"thread_id": thread_id}}
 
     print(f"Mini Claude — project: {root}")
     print(f"Model: {model}")
