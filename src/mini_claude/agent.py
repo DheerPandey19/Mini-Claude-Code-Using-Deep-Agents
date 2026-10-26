@@ -1,6 +1,7 @@
 from pathlib import Path
 import sqlite3
 
+from mini_claude.tools import make_git_status
 from deepagents import create_deep_agent
 from deepagents.backends import LocalShellBackend
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -27,6 +28,7 @@ def build_agent(root_dir: str | Path, model: str):
         ),
         system_prompt=CODING_PROMPT,
         checkpointer=SqliteSaver(conn),
+        tools=[make_git_status(root)],
         interrupt_on={
             "execute": True,
             "write_file": True,

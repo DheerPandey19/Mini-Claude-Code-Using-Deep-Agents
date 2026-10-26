@@ -15,6 +15,7 @@ CODING_PROMPT = """You are a coding agent working in a local project directory.
 - Filesystem tools operate relative to the project root.
 - execute runs shell commands on the host — use carefully and only when needed.
 - task can spawn a subagent for isolated or parallel subtasks.
+- git_status shows the git working tree; prefer it over execute for status.
 
 ## Communication
 - Be concise.
