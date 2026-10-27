@@ -21,6 +21,14 @@ def _thread_id(root: Path, requested: str | None) -> str:
     path.write_text(new_id, encoding="utf-8")
     return new_id
 
+def _is_ai_token(token) -> bool:
+    return getattr(token, "type", "") in {"ai", "AIMessageChunk"}
+
+def _tool_name(token) -> str | None:
+    if getattr(token, "type", "") in {"tool", "ToolMessageChunk"}:
+        return getattr(token, "name", None) or "tool"
+    return None
+
 def _print_chunk_content(content) -> None:
     if not content:
         return
@@ -63,7 +71,7 @@ def run_turn(agent, user_text: str, config: dict) -> None:
 
     while True:
         interrupted = False
-        print("agent> ", end="", flush=True)
+        on_agent_line = False
 
         try:
             for mode, data in agent.stream(
@@ -73,7 +81,20 @@ def run_turn(agent, user_text: str, config: dict) -> None:
             ):
                 if mode == "messages":
                     token, _metadata = data
-                    _print_chunk_content(getattr(token, "content", None))
+                    name = _tool_name(token)
+                    if name:
+                        print(f"\ntool> {name}")
+                        on_agent_line = False
+                        continue
+                    if not _is_ai_token(token):
+                        continue
+                    content = getattr(token, "content", None)
+                    if not content:
+                        continue
+                    if not on_agent_line:
+                        print("agent> ", end="", flush=True)
+                        on_agent_line = True
+                    _print_chunk_content(content)
                 elif mode == "updates" and isinstance(data, dict) and "__interrupt__" in data:
                     interrupt_value = data["__interrupt__"][0].value
                     decisions = _ask_decisions(interrupt_value["action_requests"])
