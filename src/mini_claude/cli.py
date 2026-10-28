@@ -21,6 +21,13 @@ def _thread_id(root: Path, requested: str | None) -> str:
     path.write_text(new_id, encoding="utf-8")
     return new_id
 
+def _new_thread_id(root: Path) -> str:
+    path = root / ".mini-claude" / "thread_id"
+    new_id = str(uuid.uuid4())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new_id, encoding="utf-8")
+    return new_id
+
 def _is_ai_token(token) -> bool:
     return getattr(token, "type", "") in {"ai", "AIMessageChunk"}
 
@@ -142,7 +149,8 @@ def main() -> None:
 
     print(f"Mini Claude — project: {root}")
     print(f"Model: {model}")
-    print("Type 'exit' or 'quit' to leave.\n")
+    print(f"Thread id : {thread_id}")
+    print("Type /help for commands.\n")
 
     if args.prompt:
         run_turn(agent, args.prompt, config)
@@ -157,6 +165,22 @@ def main() -> None:
 
         if not user_text:
             continue
+
+        if user_text.startswith("/"):
+            cmd = user_text.lower().split()[0]
+            if cmd in {"/exit","/quit"}:
+                break
+            if cmd in {"/help"}:
+                print("Commands: /help  /new  /exit")
+                continue
+            if cmd == "/new":
+                thread_id= _new_thread_id(root)
+                config={"configurable": {"thread_id": thread_id}}
+                print(f"Started a new conversation ({thread_id})")
+                continue
+            print(f"Unknown command: {cmd} ,.Try /help for help.")
+            continue
+
         if user_text.lower() in {"exit", "quit"}:
             break
 
