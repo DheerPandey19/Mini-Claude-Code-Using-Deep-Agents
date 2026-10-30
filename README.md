@@ -21,16 +21,19 @@ mini claude code/
   src/mini_claude/
     __init__.py
     __main__.py               # python -m mini_claude
-    prompts.py                # coding system prompt
-    agent.py                  # create_deep_agent + LocalShellBackend
-    cli.py                    # REPL, one-shot, HITL approve/reject
+    prompts.py                # CODING_PROMPT + EXPLORER_PROMPT
+    agent.py                  # create_deep_agent, SqliteSaver, explorer
+    tools.py                  # custom git_status tool
+    cli.py                    # REPL, streaming, slash commands, HITL
+  .mini-claude/               # runtime data (gitignored): checkpoints + thread id
 ```
 
 | File | Role |
 | --- | --- |
-| `prompts.py` | Instructs explore-first, small edits, careful shell use |
-| `agent.py` | Builds the Deep Agents harness for a given project root |
-| `cli.py` | Loads env, runs chat, handles `__interrupt__` for `execute` |
+| `prompts.py` | Parent coding prompt; read-only explorer prompt |
+| `agent.py` | Harness: backend, checkpointer, `git_status`, explorer subagent, HITL |
+| `tools.py` | Custom tool the model can call instead of `execute` for `git status` |
+| `cli.py` | Env, chat, token vs tool streaming, `/help` `/new` `/exit`, approvals |
 
 ## What Deep Agents provides (you don't implement these)
 
@@ -38,14 +41,17 @@ mini claude code/
 - Shell: `execute` (via `LocalShellBackend`)
 - Subagent delegation: `task`
 - Human-in-the-loop when `interrupt_on` is set
-- In-session memory via a checkpointer (`MemorySaver` here)
+- Checkpointer API (this repo uses SQLite, not in-memory)
 
-## Concepts in this repo
+## What this repo adds
 
 - **Backend** — `LocalShellBackend`: real project files + host shell
-- **Checkpointer** — `MemorySaver`: multi-turn chat while the process is alive
-- **HITL** — `interrupt_on={"execute": True}`: CLI asks y/n before shell runs
-- **Your code** — prompt, agent factory, terminal UI; not the tool runtime
+- **Checkpointer** — `SqliteSaver` in `.mini-claude/checkpoints.sqlite`; chat survives restart
+- **Thread** — saved in `.mini-claude/thread_id`, or pass `--thread`; `/new` starts a fresh page
+- **HITL** — approve `execute`, `write_file`, `edit_file`, and `delete`
+- **Custom tool** — `git_status`
+- **Custom subagent** — `explorer`: read-only (`ls` / `glob` / `grep` / `read_file`); parent calls `task`
+- **CLI** — streams model text as `agent>` and tool names as `tool>`; slash commands
 
 ## Setup
 
@@ -77,6 +83,8 @@ mini claude code/
 mini-claude --cwd .
 ```
 
+Point `--cwd` at any project folder (this repo is small; a larger tree is a better test for explorer).
+
 One-shot:
 
 ```powershell
@@ -89,49 +97,46 @@ Or:
 python -m mini_claude --cwd .
 ```
 
-Type `exit` or `quit` to leave. When the agent wants to run a shell command,
-you'll see **Approve? [y/N]**.
+Fresh conversation (does not reuse the saved thread):
+
+```powershell
+mini-claude --cwd . --thread explorer-test
+```
+
+In the REPL: `/help`, `/new` (new thread id), `/exit`. `exit` / `quit` still work.
+
+When the agent wants to run a gated tool, you'll see **Approve? [y/N]**.
+
+To see the explorer: `/new`, then ask to map the repo. You should see `tool> task` and a short report, not a raw file dump.
 
 ## Security
 
 `LocalShellBackend` runs commands as your user. Filesystem tools are rooted at
 `--cwd` (with `virtual_mode=True`), but `execute` is not a sandbox. Only approve
-commands you understand. Do not commit `.env`.
-
-## Testing Instructions
-
-- Run tests by executing: `pytest`
-- Ensure all tests pass before making changes.
-- Review test coverage to ensure all features are covered.
-
-## Contributing Guide
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Commit your changes with clear messages.
-4. Submit a pull request for review.
-
-## FAQ
-
-- **What models can I use?**
-  You can specify any model in the `.env` file that is compatible with your use case.
-- **How to update dependencies?**
-  Update `pyproject.toml` and run `pip install -e .`.
-
-## Detailed Usage Examples
-
-- Run a one-shot command:
-  ```powershell
-  mini-claude --cwd . "List the Python files in this project"
-  ```
-- Start a terminal session:
-  ```powershell
-  python -m mini_claude --cwd .
-  ```
+commands you understand. Do not commit `.env`. There is no path allow/deny list
+yet (`.env` is not blocked by the agent).
 
 ## Status
 
-v1 learning build is complete: prompt + agent + CLI with shell approval.
+Learning build past v1. In place:
 
-Possible next steps (optional): streaming output, durable checkpointer, custom
-tools, gate file writes, MCP, skills.
+- Coding prompt + explorer prompt
+- Agent factory with SQLite checkpoints
+- CLI with streaming, slash commands, and HITL on shell and file writes
+- Custom `git_status` tool
+- Custom read-only `explorer` subagent (`task`)
+
+Not built yet (sensible next lessons):
+
+- `AGENTS.md` memory (project conventions every run)
+- Skills (`SKILL.md`, loaded on demand)
+- Path permissions (block `.env` / `.git`)
+- MCP tools
+- Extra specialists (e.g. a reviewer)
+- Tests (no pytest suite in this repo)
+
+## FAQ
+
+- **What models can I use?** Any OpenAI-compatible model via `OPENAI_MODEL` in `.env` (prefixed as `openai:…` if you omit the provider).
+- **How do I update dependencies?** Change `pyproject.toml` and run `pip install -e .`.
+- **Why does chat remember the last session?** SQLite + a saved `thread_id`. Use `/new` or `--thread some-id` for a blank conversation.
